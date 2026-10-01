@@ -1,0 +1,1 @@
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Cristtev/Ride-A-Pet/refs/heads/main/Ride%20A%20Pet%20Beta"))()
