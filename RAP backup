@@ -1,0 +1,570 @@
+-- Services
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- Configuration & State
+local Config = {
+	ESPEnabled = false,
+	MaxDistance = 2000, -- 2000 meters/studs
+	ToggleKey = Enum.KeyCode.RightControl,
+	MenuVisible = true,
+	
+	-- Isolated System 1: Speed & Jump Mods
+	SpeedJumpEnabled = false,
+	WalkSpeed = 16,
+	JumpPower = 50,
+	
+	-- Isolated System 2: Infinite Jump
+	InfJumpEnabled = false,
+	
+	-- Isolated System 3: Anti-Ragdoll
+	AntiRagdollEnabled = false
+}
+
+local ActiveEspDrawings = {}
+
+-- Create ScreenGui securely
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "EggESPAndMovementPro_V7"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ================= DRAGGABLE MOBILE BUTTON =================
+local MobileBtn = Instance.new("TextButton")
+MobileBtn.Name = "MobileToggle"
+MobileBtn.Size = UDim2.new(0, 50, 0, 50)
+MobileBtn.Position = UDim2.new(0.02, 0, 0.4, 0)
+MobileBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MobileBtn.Text = "Menu"
+MobileBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MobileBtn.TextSize = 12
+MobileBtn.Font = Enum.Font.SourceSansBold
+MobileBtn.Parent = ScreenGui
+
+local MobCorner = Instance.new("UICorner")
+MobCorner.CornerRadius = UDim.new(0, 25)
+MobCorner.Parent = MobileBtn
+
+-- ================= MAIN GUI FRAME =================
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 260, 0, 450)
+MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- Title Bar
+local TitleBar = Instance.new("TextLabel")
+TitleBar.Size = UDim2.new(1, 0, 0, 35)
+TitleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+TitleBar.Text = "  Egg ESP (2000m) & Pro Systems"
+TitleBar.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleBar.TextSize = 13
+TitleBar.Font = Enum.Font.SourceSansBold
+TitleBar.TextXAlignment = Enum.TextXAlignment.Left
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = TitleBar
+
+-- Close ("X") Button
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 35, 0, 35)
+CloseButton.Position = UDim2.new(1, -35, 0, 0)
+CloseButton.BackgroundTransparency = 1
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(220, 60, 60)
+CloseButton.TextSize = 16
+CloseButton.Font = Enum.Font.SourceSansBold
+CloseButton.Parent = MainFrame
+
+-- Scrollable Container
+local ScrollContainer = Instance.new("ScrollingFrame")
+ScrollContainer.Size = UDim2.new(1, 0, 1, -40)
+ScrollContainer.Position = UDim2.new(0, 0, 0, 40)
+ScrollContainer.BackgroundTransparency = 1
+ScrollContainer.BorderSizePixel = 0
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 480)
+ScrollContainer.ScrollBarThickness = 4
+ScrollContainer.Parent = MainFrame
+
+-- ================= ESP SECTION =================
+local ESPToggleBtn = Instance.new("TextButton")
+ESPToggleBtn.Size = UDim2.new(0.85, 0, 0, 32)
+ESPToggleBtn.Position = UDim2.new(0.075, 0, 0.02, 0)
+ESPToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+ESPToggleBtn.Text = "ESP (2000m): OFF"
+ESPToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPToggleBtn.TextSize = 13
+ESPToggleBtn.Font = Enum.Font.SourceSansBold
+ESPToggleBtn.Parent = ScrollContainer
+
+local BtnCorner1 = Instance.new("UICorner")
+BtnCorner1.CornerRadius = UDim.new(0, 6)
+BtnCorner1.Parent = ESPToggleBtn
+
+local KeyInput = Instance.new("TextBox")
+KeyInput.Size = UDim2.new(0.85, 0, 0, 28)
+KeyInput.Position = UDim2.new(0.075, 0, 0.10, 0)
+KeyInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+KeyInput.Text = "RightControl"
+KeyInput.PlaceholderText = "Toggle Key..."
+KeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+KeyInput.TextSize = 12
+KeyInput.Font = Enum.Font.SourceSans
+KeyInput.Parent = ScrollContainer
+
+local KeyCorner = Instance.new("UICorner")
+KeyCorner.CornerRadius = UDim.new(0, 6)
+KeyCorner.Parent = KeyInput
+
+-- ================= SYSTEM 1: SPEED & JUMP SECTION =================
+local Separator1 = Instance.new("Frame")
+Separator1.Size = UDim2.new(0.85, 0, 0, 2)
+Separator1.Position = UDim2.new(0.075, 0, 0.18, 0)
+Separator1.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Separator1.BorderSizePixel = 0
+Separator1.Parent = ScrollContainer
+
+local SpeedJumpToggleBtn = Instance.new("TextButton")
+SpeedJumpToggleBtn.Size = UDim2.new(0.85, 0, 0, 30)
+SpeedJumpToggleBtn.Position = UDim2.new(0.075, 0, 0.20, 0)
+SpeedJumpToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+SpeedJumpToggleBtn.Text = "Speed & Jump System: OFF"
+SpeedJumpToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedJumpToggleBtn.TextSize = 12
+SpeedJumpToggleBtn.Font = Enum.Font.SourceSansBold
+SpeedJumpToggleBtn.Parent = ScrollContainer
+
+local BtnCorner2 = Instance.new("UICorner")
+BtnCorner2.CornerRadius = UDim.new(0, 6)
+BtnCorner2.Parent = SpeedJumpToggleBtn
+
+-- Professional Slider Creator Function
+local function createSlider(name, defaultVal, posY, callback)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(0.85, 0, 0, 18)
+	label.Position = UDim2.new(0.075, 0, posY, 0)
+	label.BackgroundTransparency = 1
+	label.Text = string.format("%s: %d", name, defaultVal)
+	label.TextColor3 = Color3.fromRGB(200, 200, 200)
+	label.TextSize = 11
+	label.Font = Enum.Font.SourceSansBold
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = ScrollContainer
+
+	local bgBar = Instance.new("Frame")
+	bgBar.Size = UDim2.new(0.85, 0, 0, 22)
+	bgBar.Position = UDim2.new(0.075, 0, posY + 0.045, 0)
+	bgBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	bgBar.BorderSizePixel = 0
+	bgBar.Parent = ScrollContainer
+
+	local barCorner = Instance.new("UICorner")
+	barCorner.CornerRadius = UDim.new(0, 5)
+	barCorner.Parent = bgBar
+
+	local fillBar = Instance.new("Frame")
+	fillBar.Size = UDim2.new(defaultVal / 500, 0, 1, 0)
+	fillBar.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+	fillBar.BorderSizePixel = 0
+	fillBar.Parent = bgBar
+
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(0, 5)
+	fillCorner.Parent = fillBar
+
+	local textBox = Instance.new("TextBox")
+	textBox.Size = UDim2.new(0, 60, 1, 0)
+	textBox.Position = UDim2.new(1, -65, 0, 0)
+	textBox.BackgroundTransparency = 1
+	textBox.Text = tostring(defaultVal)
+	textBox.PlaceholderText = "0-500"
+	textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+	textBox.TextSize = 11
+	textBox.Font = Enum.Font.SourceSansBold
+	textBox.Parent = bgBar
+
+	local draggingSlider = false
+	
+	bgBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			draggingSlider = true
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			draggingSlider = false
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local relativeX = math.clamp((input.Position.X - bgBar.AbsolutePosition.X) / bgBar.AbsoluteSize.X, 0, 1)
+			local calculatedVal = math.floor(relativeX * 500)
+			fillBar.Size = UDim2.new(relativeX, 0, 1, 0)
+			textBox.Text = tostring(calculatedVal)
+			label.Text = string.format("%s: %d", name, calculatedVal)
+			callback(calculatedVal)
+		end
+	end)
+
+	textBox.FocusLost:Connect(function()
+		local parsedVal = tonumber(textBox.Text)
+		if parsedVal then
+			parsedVal = math.clamp(parsedVal, 0, 500)
+			textBox.Text = tostring(parsedVal)
+			fillBar.Size = UDim2.new(parsedVal / 500, 0, 1, 0)
+			label.Text = string.format("%s: %d", name, parsedVal)
+			callback(parsedVal)
+		else
+			textBox.Text = tostring(defaultVal)
+		end
+	end)
+end
+
+-- Initialize Sliders
+createSlider("WalkSpeed", Config.WalkSpeed, 0.28, function(val)
+	Config.WalkSpeed = val
+end)
+
+createSlider("JumpPower", Config.JumpPower, 0.40, function(val)
+	Config.JumpPower = val
+end)
+
+
+-- ================= SYSTEM 2: INFINITE JUMP SECTION =================
+local Separator2 = Instance.new("Frame")
+Separator2.Size = UDim2.new(0.85, 0, 0, 2)
+Separator2.Position = UDim2.new(0.075, 0, 0.52, 0)
+Separator2.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Separator2.BorderSizePixel = 0
+Separator2.Parent = ScrollContainer
+
+local InfJumpBtn = Instance.new("TextButton")
+InfJumpBtn.Size = UDim2.new(0.85, 0, 0, 30)
+InfJumpBtn.Position = UDim2.new(0.075, 0, 0.55, 0)
+InfJumpBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+InfJumpBtn.Text = "Inf Jump System: OFF"
+InfJumpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+InfJumpBtn.TextSize = 12
+InfJumpBtn.Font = Enum.Font.SourceSansBold
+InfJumpBtn.Parent = ScrollContainer
+
+local InfCorner = Instance.new("UICorner")
+InfCorner.CornerRadius = UDim.new(0, 6)
+InfCorner.Parent = InfJumpBtn
+
+
+-- ================= SYSTEM 3: ANTI-RAGDOLL SECTION =================
+local Separator3 = Instance.new("Frame")
+Separator3.Size = UDim2.new(0.85, 0, 0, 2)
+Separator3.Position = UDim2.new(0.075, 0, 0.67, 0)
+Separator3.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Separator3.BorderSizePixel = 0
+Separator3.Parent = ScrollContainer
+
+local AntiRagdollBtn = Instance.new("TextButton")
+AntiRagdollBtn.Size = UDim2.new(0.85, 0, 0, 30)
+AntiRagdollBtn.Position = UDim2.new(0.075, 0, 0.70, 0)
+AntiRagdollBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+AntiRagdollBtn.Text = "Anti-Ragdoll System: OFF"
+AntiRagdollBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AntiRagdollBtn.TextSize = 12
+AntiRagdollBtn.Font = Enum.Font.SourceSansBold
+AntiRagdollBtn.Parent = ScrollContainer
+
+local AntiCorner = Instance.new("UICorner")
+AntiCorner.CornerRadius = UDim.new(0, 6)
+AntiCorner.Parent = AntiRagdollBtn
+
+-- Info Footnote
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Size = UDim2.new(1, 0, 0, 20)
+InfoLabel.Position = UDim2.new(0, 0, 0.83, 0)
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.Text = "Advanced Anti-Ragdoll Active"
+InfoLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
+InfoLabel.TextSize = 11
+InfoLabel.Font = Enum.Font.SourceSans
+InfoLabel.Parent = ScrollContainer
+
+
+-- ================= DRAGGABLE WINDOW LOGIC =================
+local function makeDraggable(frame, handle)
+	local dragging, dragInput, dragStart, startPos
+	handle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = frame.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+
+	RunService.RenderStepped:Connect(function()
+		if dragging and dragInput then
+			local delta = dragInput.Position - dragStart
+			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+end
+
+makeDraggable(MainFrame, TitleBar)
+makeDraggable(MobileBtn, MobileBtn)
+
+-- ================= INTERACTION HOOKS =================
+local function toggleMenuVisibility()
+	Config.MenuVisible = not Config.MenuVisible
+	MainFrame.Visible = Config.MenuVisible
+end
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if not processed and input.KeyCode == Config.ToggleKey then
+		toggleMenuVisibility()
+	end
+end)
+
+MobileBtn.MouseButton1Click:Connect(toggleMenuVisibility)
+
+KeyInput.FocusLost:Connect(function()
+	local keyName = string.upper(KeyInput.Text)
+	local success, keyCode = pcall(function() return Enum.KeyCode[keyName] end)
+	if success and keyCode then
+		Config.ToggleKey = keyCode
+		KeyInput.Text = keyName
+	else
+		KeyInput.Text = tostring(Config.ToggleKey.Name)
+	end
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+	Config.ESPEnabled = false
+	Config.SpeedJumpEnabled = false
+	Config.InfJumpEnabled = false
+	Config.AntiRagdollEnabled = false
+	for _, data in pairs(ActiveEspDrawings) do
+		if data.Drawing then data.Drawing:Remove() end
+	end
+	ScreenGui:Destroy()
+end)
+
+ESPToggleBtn.MouseButton1Click:Connect(function()
+	Config.ESPEnabled = not Config.ESPEnabled
+	if Config.ESPEnabled then
+		ESPToggleBtn.Text = "ESP (2000m): ON"
+		ESPToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+	else
+		ESPToggleBtn.Text = "ESP (2000m): OFF"
+		ESPToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+		for _, data in pairs(ActiveEspDrawings) do
+			if data.Drawing then data.Drawing:Remove() end
+		end
+		ActiveEspDrawings = {}
+	end
+end)
+
+SpeedJumpToggleBtn.MouseButton1Click:Connect(function()
+	Config.SpeedJumpEnabled = not Config.SpeedJumpEnabled
+	if Config.SpeedJumpEnabled then
+		SpeedJumpToggleBtn.Text = "Speed & Jump System: ON"
+		SpeedJumpToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+	else
+		SpeedJumpToggleBtn.Text = "Speed & Jump System: OFF"
+		SpeedJumpToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	end
+end)
+
+InfJumpBtn.MouseButton1Click:Connect(function()
+	Config.InfJumpEnabled = not Config.InfJumpEnabled
+	if Config.InfJumpEnabled then
+		InfJumpBtn.Text = "Inf Jump System: ON"
+		InfJumpBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+	else
+		InfJumpBtn.Text = "Inf Jump System: OFF"
+		InfJumpBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	end
+end)
+
+AntiRagdollBtn.MouseButton1Click:Connect(function()
+	Config.AntiRagdollEnabled = not Config.AntiRagdollEnabled
+	if Config.AntiRagdollEnabled then
+		AntiRagdollBtn.Text = "Anti-Ragdoll System: ON"
+		AntiRagdollBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+	else
+		AntiRagdollBtn.Text = "Anti-Ragdoll System: OFF"
+		AntiRagdollBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	end
+end)
+
+
+-- ================= ISOLATED SYSTEM 1: SPEED & JUMP LOGIC =================
+RunService.RenderStepped:Connect(function()
+	if not Config.SpeedJumpEnabled then return end
+
+	local char = LocalPlayer.Character
+	if not char then return end
+
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	local rootPart = char:FindFirstChild("HumanoidRootPart")
+	
+	if humanoid then
+		humanoid.WalkSpeed = Config.WalkSpeed
+		pcall(function()
+			humanoid.UseJumpPower = true
+			humanoid.JumpPower = Config.JumpPower
+		end)
+		
+		if rootPart and humanoid.MoveDirection.Magnitude > 0 then
+			local currentVel = rootPart.AssemblyLinearVelocity
+			local targetDir = humanoid.MoveDirection
+			local speedRatio = Config.WalkSpeed / 16
+			
+			if speedRatio > 1 then
+				rootPart.AssemblyLinearVelocity = Vector3.new(
+					targetDir.X * Config.WalkSpeed,
+					currentVel.Y,
+					targetDir.Z * Config.WalkSpeed
+				)
+			end
+		end
+	end
+end)
+
+
+-- ================= ISOLATED SYSTEM 2: INFINITE JUMP LOGIC =================
+UserInputService.JumpRequest:Connect(function()
+	if not Config.InfJumpEnabled then return end
+
+	local char = LocalPlayer.Character
+	local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+
+	if rootPart and humanoid then
+		local currentVel = rootPart.AssemblyLinearVelocity
+		local jumpForce = math.clamp(Config.JumpPower, 50, 200)
+		
+		rootPart.AssemblyLinearVelocity = Vector3.new(currentVel.X, jumpForce * 0.8, currentVel.Z)
+		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+	end
+end)
+
+
+-- ================= ISOLATED SYSTEM 3: ANTI-RAGDOLL LOGIC =================
+RunService.Stepped:Connect(function()
+	if not Config.AntiRagdollEnabled then return end
+
+	local char = LocalPlayer.Character
+	if not char then return end
+
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		-- Block bad states that cause ragdolling/falling
+		if humanoid:GetState() == Enum.HumanoidStateType.Ragdoll or 
+		   humanoid:GetState() == Enum.HumanoidStateType.FallingDown or 
+		   humanoid:GetState() == Enum.HumanoidStateType.PlatformStanding then
+			humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+			humanoid.PlatformStand = false
+		end
+	end
+
+	-- Automatically strip custom joints or constraints applied by ragdoll scripts
+	for _, descendant in ipairs(char:GetDescendants()) do
+		if descendant:IsA("BallSocketConstraint") or descendant:IsA("HingeConstraint") then
+			descendant:Destroy()
+		end
+	end
+end)
+
+
+-- ================= LAG-OPTIMIZED EGG ESP LOGIC (2000m) =================
+local function isValidEgg(object)
+	return object:IsA("BasePart") and string.find(string.lower(object.Name), "egg") ~= nil
+end
+
+task.spawn(function()
+	while true do
+		task.wait(1.5)
+		if not Config.ESPEnabled then continue end
+
+		local char = LocalPlayer.Character
+		local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+		if not rootPart then continue end
+
+		local foundEggs = {}
+		
+		for _, obj in ipairs(Workspace:GetDescendants()) do
+			if isValidEgg(obj) then
+				local dist = (rootPart.Position - obj.Position).Magnitude
+				if dist <= Config.MaxDistance then
+					foundEggs[obj] = dist
+				end
+			end
+		end
+
+		for obj, data in pairs(ActiveEspDrawings) do
+			if not foundEggs[obj] or not obj.Parent then
+				if data.Drawing then data.Drawing:Remove() end
+				ActiveEspDrawings[obj] = nil
+			end
+		end
+
+		for obj, _ in pairs(foundEggs) do
+			if not ActiveEspDrawings[obj] then
+				local textDraw = Drawing.new("Text")
+				textDraw.Visible = false
+				textDraw.Center = true
+				textDraw.Outline = true
+				textDraw.Font = Drawing.Fonts.UI
+				textDraw.Size = 15
+				textDraw.Color = Color3.fromRGB(255, 230, 0)
+				ActiveEspDrawings[obj] = { Drawing = textDraw }
+			end
+		end
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	if not Config.ESPEnabled then return end
+
+	local char = LocalPlayer.Character
+	local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+	if not rootPart then return end
+
+	for obj, data in pairs(ActiveEspDrawings) do
+		if obj and obj.Parent then
+			local screenPos, onScreen = Camera:WorldToViewportPoint(obj.Position + Vector3.new(0, 2, 0))
+			if onScreen then
+				local distance = (rootPart.Position - obj.Position).Magnitude
+				data.Drawing.Position = Vector2.new(screenPos.X, screenPos.Y)
+				data.Drawing.Text = string.format("[Egg]\n%dm", math.floor(distance))
+				data.Drawing.Visible = true
+			else
+				data.Drawing.Visible = false
+			end
+		end
+	end
+end)
